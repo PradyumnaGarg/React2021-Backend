@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 2000;
 
 
 app.use(express.json())
+app.use(express.static('build'))
 app.use(morgan(function (tokens, req, res) {
   return [
     tokens.method(req, res),
