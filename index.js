@@ -3,7 +3,8 @@ const app = express();
 const morgan = require('morgan');
 const cors = require('cors');
 const PORT = process.env.PORT || 2000;
-
+const db = require('./mongo');
+const mongoose = require('mongoose');
 
 app.use(express.json())
 app.use(express.static('build'))
@@ -19,85 +20,106 @@ app.use(morgan(function (tokens, req, res) {
 }));
 app.use(cors())
 
-const persons = [
-    { 
-        "id": 1,
-        "name": "Arto Hellas", 
-        "number": "040-123456"
-      },
-      { 
-        "id": 2,
-        "name": "Ada Lovelace", 
-        "number": "39-44-5323523"
-      },
-      { 
-        "id": 3,
-        "name": "Dan Abramov", 
-        "number": "12-43-234345"
-      },
-      { 
-        "id": 4,
-        "name": "Mary Poppendieck", 
-        "number": "39-23-6423122"
-      }
-]
+const personSchema = new mongoose.Schema({
+  name: String,
+  number: Number
+})
+
+const Person = new mongoose.model('person', personSchema);
 
 app.get('/api/persons', (req, res, next) => {
+  Person.find({})
+  .then((persons) => {
     res.status(200);
     res.json(persons);
+  })
+  .catch((error) => next(error));
 })
 
 app.get('/api/info', (req, res) => {
-    const personsLength = persons.length;
-    const date = new Date().toString();
+    Person
+    .find({})
+    .count()
+    .then((count) => {
+      const date = new Date().toString();
+      res.send(`<p>Phonebook has info of ${count} people</p> <p>${date}</p>`)
+    })
+    .catch((error) => next(error));
 
-    res.send(`<p>Phonebook has info of ${personsLength} people</p> <p>${date}</p>`)
 })
 
-app.get('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const person = persons.find(person => person.id === id);
-
-  if (person) {
-    res.json(person);
-  } else {
-    res.status(404).json({error: 'Record not found'})
-  }
+app.get('/api/persons/:id', (req, res, next) => {
+  const id = mongoose.Types.ObjectId(req.params.id);
+  Person.findOne({_id: id})
+  .then((person) => {
+    if (person) {
+      res.json(person);
+    } else {
+      next({name: 'NotFound'})
+    }
+  })
+  .catch((error) => {
+    next(error);
+  });
 })
 
-app.delete('/api/persons/:id', (req, res) => {
-  const id = Number(req.params.id);
-  const personIndex = persons.findIndex(person => person.id === id);
-  if (personIndex > -1) {
-    persons.splice(personIndex, 1);
-    res.status(204).json({resp: 'No Content'})
-  } else {
-    res.status(404).json({error: 'Record not found'})
-  }
+app.put('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndUpdate(req.params.id, { ...req.body }, { new: true })
+  .then((updatedPerson) => {
+    res.status(200).json(updatedPerson);
+  })
+  .catch((error) => next(error));
 })
 
-app.post('/api/persons', (req, res) => {
+app.delete('/api/persons/:id', (req, res, next) => {
+  Person.findByIdAndRemove(req.params.id)
+  .then((result) => {
+    console.log('Delete Result', result)
+    if(result) {
+      res.status(204).json({resp: 'No Content'});
+    } else {
+      next({name: 'NotFound'});
+    }
+  })
+  .catch((error) => {
+    next(error);
+  })
+})
+
+app.post('/api/persons', (req, res, next) => {
   if (!req.body.name || !req.body.number) {
-    res.status(401).json({error: 'No sufficient data provided'})
+    res.status(400).json({error: 'No sufficient data provided'})
     return;
   }
 
-  const personIndex = persons.findIndex(person => person.name === req.body.name);
+  Person.findOne({name: req.body.name})
+  .then((person) => {
+    if(person) {
+      res.status(400).json({error: 'Name already exist'})
+      return;
+    }
 
-  if (personIndex > -1) {
-    res.status(401).json({error: 'Name already exist'})
-    return;
-  }
-
-  const person = {
-    id: Math.floor(10000 + (Math.random() * 90000)),
-    name: req.body.name,
-    number: req.body.number
-  }
-
-  persons.push(person);
-  res.status(201).json(person);
+    Person.create({name: req.body.name, number: req.body.number})
+    .then((person) => {
+      res.status(201).json(person);
+    })
+    .catch((error) => next(error))
+  })
+  .catch((error) => next(error));
 })
+
+const errorHandler = (error, request, response, next) => {
+  console.log(error.name);
+  if (error.name === 'CastError') {
+    return response.status(400).json({error: '_id Malformed'});
+  } else if (error.name === 'NotFound') {
+    return response.status(404).json({error: 'Record not found'});
+  } else {
+    return response.status(500).json({error: error.message});
+  }
+}
+
+app.use(errorHandler);
 
 app.listen(PORT, () => {
     console.log(`Server is listening at ${PORT}`);
