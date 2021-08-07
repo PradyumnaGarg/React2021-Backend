@@ -5,6 +5,7 @@ const cors = require('cors');
 const PORT = process.env.PORT || 2000;
 const db = require('./mongo');
 const mongoose = require('mongoose');
+const uniqueValidator = require('mongoose-unique-validator');
 
 app.use(express.json())
 app.use(express.static('build'))
@@ -21,9 +22,20 @@ app.use(morgan(function (tokens, req, res) {
 app.use(cors())
 
 const personSchema = new mongoose.Schema({
-  name: String,
-  number: Number
+  name: {
+    type: String,
+    required: true,
+    unique: true,
+    minlength: 5,
+  },
+  number: {
+    type: Number,
+    required: true,
+    min: 10000000,
+  }
 })
+
+personSchema.plugin(uniqueValidator);
 
 const Person = new mongoose.model('person', personSchema);
 
@@ -87,23 +99,10 @@ app.delete('/api/persons/:id', (req, res, next) => {
 })
 
 app.post('/api/persons', (req, res, next) => {
-  if (!req.body.name || !req.body.number) {
-    res.status(400).json({error: 'No sufficient data provided'})
-    return;
-  }
-
-  Person.findOne({name: req.body.name})
+  const person = new Person({name: req.body.name, number: req.body.number});
+  person.save()
   .then((person) => {
-    if(person) {
-      res.status(400).json({error: 'Name already exist'})
-      return;
-    }
-
-    Person.create({name: req.body.name, number: req.body.number})
-    .then((person) => {
-      res.status(201).json(person);
-    })
-    .catch((error) => next(error))
+    res.status(201).json(person);
   })
   .catch((error) => next(error));
 })
