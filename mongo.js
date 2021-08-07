@@ -1,7 +1,7 @@
+require('dotenv').config();
+
 const mongoose = require('mongoose');
-
-
-const url = `mongodb+srv://user:pradumna143@cluster0.f7uqy.mongodb.net/myFirstDatabase?retryWrites=true&w=majority`
+const url = process.env.MONGODB_URL;
 
 mongoose
 .connect(url, {
