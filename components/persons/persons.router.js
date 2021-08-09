@@ -59,7 +59,7 @@ personsRouter.delete('/:id', (req, res, next) => {
 });
 
 personsRouter.post('/', (req, res, next) => {
-  const person = new Person({ name: req.body.name, number: req.body.number });
+  const person = new Person({ name: req.body.name, number: Number(req.body.number) });
   person
     .save()
     .then((savedPerson) => {
