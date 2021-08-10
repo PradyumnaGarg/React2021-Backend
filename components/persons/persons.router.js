@@ -65,7 +65,9 @@ personsRouter.post('/', (req, res, next) => {
     .then((savedPerson) => {
       res.status(201).json(savedPerson);
     })
-    .catch((error) => next(error));
+    .catch((error) =>{
+      next(error);
+    });
 });
 
 module.exports = personsRouter;
